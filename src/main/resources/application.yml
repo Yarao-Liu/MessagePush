@@ -1,0 +1,9 @@
+spring:
+  rabbitmq:
+    port: 5672
+    virtual-host: /
+    username: hollykunge
+    password: 123456
+    host: localhost
+server:
+  port: 9090

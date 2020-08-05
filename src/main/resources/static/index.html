@@ -6,6 +6,8 @@
 </head>
 <body>
 <div id="main">
+    <p>websocket测试页面</p>
+    <p style="color: red;">使用本页面进行测试时，请将此服务与您的服务部署到一台服务器上或文本编辑器修改websocket的ip地址!</p>
     <div id="message"></div>
 </div>
 </body>
@@ -14,7 +16,7 @@
 
     //判断当前浏览器是否支持WebSocket
     if ('WebSocket' in window) {
-        websocket = new WebSocket("ws://10.11.24.223:9090/websocket?userId=DunrRu5S_AqkaxTdp&userPId=DunrRu5S");
+        websocket = new WebSocket("ws://localhost:9327/websocket?userId=DunrRu5S_AqkaxTdp&userPId=DunrRu5S");
     }
     else {
         alert('当前浏览器 不支持WebSocket')

@@ -12,18 +12,17 @@ import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeoutException;
 /**
  * @author Mr.Liu
  */
 @Component
 @ServerEndpoint(value = "/websocket")
-public class MyWebSocket {
+public class PushMsgServer {
 
-    private static Logger log = LogManager.getLogger(MyWebSocket.class);
+    private static Logger log = LogManager.getLogger(PushMsgServer.class);
     /*
-     * rabbitmq配置信息
+     * 手动注入rabbitmq配置信息
      */
     public static RabbitConfig rabbitConfig;
     /**
@@ -31,18 +30,13 @@ public class MyWebSocket {
      */
     private Session session;
     /**
-     *   session会话管理
-     */
-    private static CopyOnWriteArraySet<Session> sessions = new CopyOnWriteArraySet<>();
-    /**
      *  在线用户数量
      */
     private static int onlineCount = 0;
     /**
      * WebSocket连接管理
      */
-    private  static ConcurrentHashMap<String,MyWebSocket>webSocketConcurrentHashMap=new ConcurrentHashMap<>();
-
+    private  static ConcurrentHashMap<String,Session>webSocketConcurrentHashMap=new ConcurrentHashMap<>();
     /**
      *  当前的用户Id和用户的PId
      */
@@ -57,30 +51,31 @@ public class MyWebSocket {
 
         String queryString = session.getQueryString();
         log.warn("PARAM:"+ queryString);
-        SplitQueryString(queryString);
-
+        splitQueryString(queryString);
+        //静态信息获取
+        String connectionId=Constant.USER_ID;
+        String queueName=Constant.QUEUE_NAME;
+        String exchangeName=Constant.EXCHANGE_NAME;
+        String routingType=Constant.ROUTING_TYPE;
+        String routingKey = Constant.ROUTING_KEY;
+        //session信息保存
         this.session = session;
-        sessions.add(session);
-        webSocketConcurrentHashMap.put(userMap.get(Constant.USER_ID),this);
-
+        webSocketConcurrentHashMap.put(userMap.get(connectionId),session);
         addOnlineCount();
-        log.info(userMap.get(Constant.USER_ID)+"连接加入！当前在线人数为" + getOnlineCount());
-
+        log.info(userMap.get(Constant.USER_ID)+"新连接加入！当前在线人数为" + getOnlineCount());
         try {
             ConnectionFactory connectionFactory = rabbitConfig.getConnectionFactory();
+            System.out.println("[x]rabbitmq的连接信息:"+rabbitConfig.toString());
             //创建一个连接
             Connection connection = connectionFactory.newConnection();
             //获取一个频道
             Channel channel = connection.createChannel();
             //如果消息队列不存在，新建消息队列
-            String QUEUE_NAME=userMap.get(Constant.USER_ID);
-            String EXCHANGE_NAME=userMap.get(Constant.USER_PID);
-            String ROUTING_TYPE="fanout";
-            channel.queueDeclare(QUEUE_NAME, true, false, false, null);
+            channel.queueDeclare(queueName, true, false, false, null);
             //如果交换机不存在新建交换机
-            channel.exchangeDeclare(EXCHANGE_NAME,ROUTING_TYPE);
+            channel.exchangeDeclare(exchangeName,routingType,true);
             //消息队列和交换机进行绑定
-            channel.queueBind(QUEUE_NAME,EXCHANGE_NAME,"");
+            channel.queueBind(queueName,exchangeName,routingKey);
             //每次从队列获取的数量,保证一次只分发一个
             channel.basicQos(1);
             log.info("[x] Waiting for messages.");
@@ -107,7 +102,7 @@ public class MyWebSocket {
             //autoAck是否自动回复，如果为true的话，每次生产者只要发送信息就会从内存中删除。
             boolean autoAck = false;
             //消息消费完成确认
-            channel.basicConsume(QUEUE_NAME, autoAck, consumer);
+            channel.basicConsume(queueName, autoAck, consumer);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (TimeoutException e) {
@@ -115,7 +110,7 @@ public class MyWebSocket {
         }
     }
 
-    private void SplitQueryString(String queryString) {
+    private void splitQueryString(String queryString) {
         String[] Infos = queryString.split("&");
         for (String info:Infos) {
             String[] str = info.split("=");
@@ -133,13 +128,10 @@ public class MyWebSocket {
      */
     @OnClose
     public void onClose() {
-        //webSocketSet.remove(this);
         webSocketConcurrentHashMap.remove(userMap.get(Constant.USER_ID));
-        sessions.remove(session);
         subOnlineCount();    //在线数减1
         log.info(userMap.get(Constant.USER_ID)+"连接关闭！当前在线人数为" + getOnlineCount());
     }
-
     /**
      * 收到客户端消息后调用的方法,这里不会用到
      * @param message 客户端发送过来的消息
@@ -150,7 +142,6 @@ public class MyWebSocket {
         //TODO nothing
         log.info("[x]来自客户端的消息:" + message);
     }
-
     /**
      * 发生错误时调用的方法
      * @param session 可选参数
@@ -158,23 +149,22 @@ public class MyWebSocket {
      */
     @OnError
     public void onError(Session session, Throwable error) {
-        log.error("发生错误");
-        error.printStackTrace();
+        log.error("[x]发生错误!"+error.getMessage());
     }
-
     /**
      * 自定义的群发消息方法
      * @param message
      * @throws IOException
      */
     public void sendMessage(String message) throws IOException {
-        //阻塞式的(同步的)
-        if (sessions.size() != 0) {
-            for (Session s : sessions) {
+        if (webSocketConcurrentHashMap.size()!=0)
+        {
+            for (Session s:webSocketConcurrentHashMap.values()) {
                 if (s != null) {
                     s.getBasicRemote().sendText(message);
                 }
             }
+
         }
         log.info("[x] 推送消息:"+message);
     }
@@ -184,10 +174,10 @@ public class MyWebSocket {
     }
 
     public static synchronized void addOnlineCount() {
-        MyWebSocket.onlineCount++;
+        PushMsgServer.onlineCount++;
     }
 
     public static synchronized void subOnlineCount() {
-        MyWebSocket.onlineCount--;
+        PushMsgServer.onlineCount--;
     }
 }

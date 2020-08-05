@@ -34,7 +34,7 @@ public class RabbitConfig {
     }
     @Override
     public String toString() {
-        return "ConnectionConfig{" +
+        return "ConnectionConfig {" +
                 "host='" + host + '\'' +
                 ", username='" + username + '\'' +
                 ", password='" + password + '\'' +

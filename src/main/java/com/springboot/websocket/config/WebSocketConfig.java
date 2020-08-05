@@ -1,6 +1,6 @@
 package com.springboot.websocket.config;
 
-import com.springboot.websocket.websocket.MyWebSocket;
+import com.springboot.websocket.websocket.PushMsgServer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +22,12 @@ public class WebSocketConfig {
         return new ServerEndpointExporter();
     }
 
+    /**
+     * 注入rabbitmq配置
+     * @param rabbitConfig
+     */
     @Autowired
     public void setRabbitConfig(RabbitConfig rabbitConfig) {
-        MyWebSocket.rabbitConfig = rabbitConfig;
+        PushMsgServer.rabbitConfig = rabbitConfig;
     }
 }

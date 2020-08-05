@@ -4,6 +4,6 @@ spring:
     virtual-host: /
     username: hollykunge
     password: 123456
-    host: localhost
+    host: 10.11.24.134
 server:
-  port: 9090
+  port: 9327

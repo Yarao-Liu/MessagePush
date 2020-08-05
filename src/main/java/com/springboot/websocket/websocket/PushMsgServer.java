@@ -1,6 +1,7 @@
 package com.springboot.websocket.websocket;
 
 import com.rabbitmq.client.*;
+import com.springboot.websocket.config.BindingConfig;
 import com.springboot.websocket.config.Constant;
 import com.springboot.websocket.config.RabbitConfig;
 import org.apache.logging.log4j.LogManager;
@@ -21,14 +22,11 @@ import java.util.concurrent.TimeoutException;
 public class PushMsgServer {
 
     private static Logger log = LogManager.getLogger(PushMsgServer.class);
-    /*
-     * 手动注入rabbitmq配置信息
+    /**
+     * 手动注入rabbitmq配置信息和绑定信息
      */
     public static RabbitConfig rabbitConfig;
-    /**
-     *   当前session会话
-     */
-    private Session session;
+    public static BindingConfig bindingConfig;
     /**
      *  在线用户数量
      */
@@ -50,22 +48,24 @@ public class PushMsgServer {
     public void onOpen(Session session) {
 
         String queryString = session.getQueryString();
-        log.warn("PARAM:"+ queryString);
+        log.warn("PARAMS:"+ queryString);
         splitQueryString(queryString);
-        //静态信息获取
+        
         String connectionId=Constant.USER_ID;
-        String queueName=Constant.QUEUE_NAME;
-        String exchangeName=Constant.EXCHANGE_NAME;
-        String routingType=Constant.ROUTING_TYPE;
-        String routingKey = Constant.ROUTING_KEY;
+
+        String queueName=bindingConfig.queueName;
+        String exchangeName=bindingConfig.exchangeName;
+        String routingType=bindingConfig.routingType;
+        String routingKey =bindingConfig.routingKey;
+
         //session信息保存
-        this.session = session;
         webSocketConcurrentHashMap.put(userMap.get(connectionId),session);
         addOnlineCount();
-        log.info(userMap.get(Constant.USER_ID)+"新连接加入！当前在线人数为" + getOnlineCount());
+        log.info(userMap.get(connectionId)+"新连接加入！当前在线人数为:" + getOnlineCount());
         try {
             ConnectionFactory connectionFactory = rabbitConfig.getConnectionFactory();
-            System.out.println("[x]rabbitmq的连接信息:"+rabbitConfig.toString());
+           log.warn("[x]rabbitmq的连接信息:"+rabbitConfig.toString());
+            log.warn("[x]exchange和Queue的绑定信息:"+bindingConfig.toString());
             //创建一个连接
             Connection connection = connectionFactory.newConnection();
             //获取一个频道

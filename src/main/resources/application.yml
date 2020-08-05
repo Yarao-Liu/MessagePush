@@ -7,3 +7,13 @@ spring:
     host: 10.11.24.134
 server:
   port: 9327
+
+#define:
+##消息队列名称
+#  queueName: queue_simulation
+##交换机名称
+#  exchangeName: exchange_simulation
+##交换机的工作模式
+#  routingType: direct
+##路由key
+#  routingKey: routekey_simulation

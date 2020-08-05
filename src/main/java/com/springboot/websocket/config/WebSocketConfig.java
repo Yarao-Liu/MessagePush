@@ -30,4 +30,9 @@ public class WebSocketConfig {
     public void setRabbitConfig(RabbitConfig rabbitConfig) {
         PushMsgServer.rabbitConfig = rabbitConfig;
     }
+
+    @Autowired
+    public void setBingConfig(BindingConfig bingConfig){
+        PushMsgServer.bindingConfig=bingConfig;
+    }
 }

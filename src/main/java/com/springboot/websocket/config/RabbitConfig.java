@@ -11,15 +11,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitConfig {
 
-    @Value("${spring.rabbitmq.host}")
+    @Value("${spring.rabbitmq.host:localhost}")
     public  String host;
-    @Value("${spring.rabbitmq.username}")
+    @Value("${spring.rabbitmq.username:guest}")
     public  String username;
-    @Value("${spring.rabbitmq.password}")
+    @Value("${spring.rabbitmq.password:guest}")
     public  String password;
-    @Value("${spring.rabbitmq.port}")
+    @Value("${spring.rabbitmq.port:5672}")
     public  Integer port;
-    @Value("${spring.rabbitmq.virtual-host}")
+    @Value("${spring.rabbitmq.virtual-host:/}")
     public  String virtualHost;
 
     public ConnectionFactory getConnectionFactory() {
@@ -32,6 +32,7 @@ public class RabbitConfig {
         factory.setVirtualHost(virtualHost);
         return factory;
     }
+
     @Override
     public String toString() {
         return "ConnectionConfig {" +

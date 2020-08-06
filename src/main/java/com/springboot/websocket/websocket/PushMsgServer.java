@@ -1,5 +1,6 @@
 package com.springboot.websocket.websocket;
 
+import com.alibaba.fastjson.JSONObject;
 import com.rabbitmq.client.*;
 import com.springboot.websocket.config.BindingConfig;
 import com.springboot.websocket.config.Constant;
@@ -12,6 +13,9 @@ import javax.websocket.*;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 /**
@@ -31,6 +35,7 @@ public class PushMsgServer {
      *  在线用户数量
      */
     private static int onlineCount = 0;
+
     /**
      * WebSocket连接管理
      */
@@ -38,7 +43,7 @@ public class PushMsgServer {
     /**
      *  当前的用户Id和用户的PId
      */
-    private ConcurrentHashMap<String, String> userMap=new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, String> userMap=new ConcurrentHashMap<>(4);
 
     /**
      * 连接打开调用的方法
@@ -48,9 +53,9 @@ public class PushMsgServer {
     public void onOpen(Session session) {
 
         String queryString = session.getQueryString();
-        log.warn("PARAMS:"+ queryString);
+        log.warn("PARAM:"+ queryString);
         splitQueryString(queryString);
-        
+        //静态信息获取
         String connectionId=Constant.USER_ID;
 
         String queueName=bindingConfig.queueName;
@@ -61,11 +66,10 @@ public class PushMsgServer {
         //session信息保存
         webSocketConcurrentHashMap.put(userMap.get(connectionId),session);
         addOnlineCount();
-        log.info(userMap.get(connectionId)+"新连接加入！当前在线人数为:" + getOnlineCount());
+        log.info(userMap.get(connectionId)+" New Connection join in！OnlineCount:" + getOnlineCount());
         try {
             ConnectionFactory connectionFactory = rabbitConfig.getConnectionFactory();
-           log.warn("[x]rabbitmq的连接信息:"+rabbitConfig.toString());
-            log.warn("[x]exchange和Queue的绑定信息:"+bindingConfig.toString());
+            log.warn("[x]RabbitMQ's Connection Info:"+rabbitConfig.toString());
             //创建一个连接
             Connection connection = connectionFactory.newConnection();
             //获取一个频道
@@ -87,11 +91,17 @@ public class PushMsgServer {
                     String message = null;
                     try {
                         message = new String(body, "UTF-8");
-                        //消息处理逻辑
-                        sendMessage(message);
                         log.info("[x] Received '" + message + "'");
+
+                        JSONObject jsonObject =(JSONObject)JSONObject.parse(message);
+                        String addressString =(String)jsonObject.get("address");
+                        String[]  addresses= addressString.split(",");
+                        List<String> address= Arrays.asList(addresses);
+                        //消息处理逻辑
+                        sendMessage(message,address);
+
                     } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
+                        log.error(e.getMessage());
                         channel.abort();
                     } finally {
                         log.info("[x] Done.");
@@ -130,7 +140,7 @@ public class PushMsgServer {
     public void onClose() {
         webSocketConcurrentHashMap.remove(userMap.get(Constant.USER_ID));
         subOnlineCount();    //在线数减1
-        log.info(userMap.get(Constant.USER_ID)+"连接关闭！当前在线人数为" + getOnlineCount());
+        log.info(userMap.get(Constant.USER_ID)+"'s Connection was Closed！OnlineCount:" + getOnlineCount());
     }
     /**
      * 收到客户端消息后调用的方法,这里不会用到
@@ -140,7 +150,7 @@ public class PushMsgServer {
     @OnMessage
     public void onMessage(String message, Session session) {
         //TODO nothing
-        log.info("[x]来自客户端的消息:" + message);
+        log.info("[x] From Client Message:" + message);
     }
     /**
      * 发生错误时调用的方法
@@ -149,24 +159,36 @@ public class PushMsgServer {
      */
     @OnError
     public void onError(Session session, Throwable error) {
-        log.error("[x]发生错误!"+error.getMessage());
+        log.error("[x]ERROR!"+error.getMessage());
     }
     /**
      * 自定义的群发消息方法
      * @param message
      * @throws IOException
      */
-    public void sendMessage(String message) throws IOException {
+    public void sendMessage(String message,List<String> address) throws IOException {
+
         if (webSocketConcurrentHashMap.size()!=0)
         {
-            for (Session s:webSocketConcurrentHashMap.values()) {
-                if (s != null) {
-                    s.getBasicRemote().sendText(message);
+            log.info("WebSocketCount:"+webSocketConcurrentHashMap.size());
+            if (address.size()>0)
+            {
+                for (int i = 0; i < address.size(); i++) {
+                    Session session = webSocketConcurrentHashMap.get(address.get(i));
+                    if (null!=session)
+                    {
+                        log.warn(address.get(i)+"‘s session is not null!");
+                        session.getBasicRemote().sendText(message);
+                        log.info("[x] Push message:"+message);
+                    }else{
+                        log.warn(address.get(i)+"'s session is null!");
+                    }
                 }
             }
 
+        }else {
+            log.error("[x] Error:WebSocket onlineCount = 0!");
         }
-        log.info("[x] 推送消息:"+message);
     }
 
     public static synchronized int getOnlineCount() {
